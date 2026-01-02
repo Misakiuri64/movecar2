@@ -1,134 +1,284 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
-  <title>车主页面预览 - MoveCar</title>
-  <style>
-    :root {
-      --sat: env(safe-area-inset-top, 0px);
-      --sar: env(safe-area-inset-right, 0px);
-      --sab: env(safe-area-inset-bottom, 0px);
-      --sal: env(safe-area-inset-left, 0px);
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-      background: linear-gradient(160deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: clamp(16px, 4vw, 24px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-    .card {
-      background: rgba(255,255,255,0.95);
-      padding: clamp(24px, 6vw, 36px);
-      border-radius: clamp(24px, 6vw, 32px);
-      text-align: center;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
-    }
-    .emoji {
-      font-size: clamp(52px, 13vw, 72px);
-      margin-bottom: clamp(16px, 4vw, 24px);
-      display: block;
-    }
-    h1 {
-      font-size: clamp(22px, 5.5vw, 28px);
-      color: #2d3748;
-      margin-bottom: 8px;
-    }
-    .subtitle {
-      color: #718096;
-      font-size: clamp(14px, 3.5vw, 16px);
-      margin-bottom: clamp(20px, 5vw, 28px);
-    }
-    .map-section {
-      background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-      border-radius: clamp(14px, 3.5vw, 18px);
-      padding: clamp(14px, 3.5vw, 20px);
-      margin-bottom: clamp(16px, 4vw, 24px);
-    }
-    .map-section p {
-      font-size: clamp(12px, 3.2vw, 14px);
-      color: #6366f1;
-      margin-bottom: 12px;
-      font-weight: 600;
-    }
-    .map-links {
-      display: flex;
-      gap: clamp(8px, 2vw, 12px);
-      flex-wrap: wrap;
-    }
-    .map-btn {
-      flex: 1;
-      min-width: 110px;
-      padding: clamp(12px, 3vw, 16px);
-      border-radius: clamp(10px, 2.5vw, 14px);
-      text-decoration: none;
-      font-weight: 600;
-      font-size: clamp(13px, 3.5vw, 15px);
-      text-align: center;
-      min-height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .map-btn.amap { background: #1890ff; color: white; }
-    .map-btn.apple { background: #1d1d1f; color: white; }
-    .btn {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-      border: none;
-      width: 100%;
-      padding: clamp(16px, 4vw, 20px);
-      border-radius: clamp(14px, 3.5vw, 18px);
-      font-size: clamp(16px, 4.2vw, 19px);
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 56px;
-    }
-    .preview-badge {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 12px;
-      z-index: 1000;
-    }
-  </style>
-</head>
-<body>
-  <div class="preview-badge">车主页面预览</div>
-  <div class="card">
-    <span class="emoji">👋</span>
-    <h1>收到挪车请求</h1>
-    <p class="subtitle">对方正在等待，请尽快确认</p>
 
-    <div class="map-section">
-      <p>📍 对方位置</p>
-      <div class="map-links">
-        <a href="#" class="map-btn amap">🗺️ 高德地图</a>
-        <a href="#" class="map-btn apple">🍎 Apple Maps</a>
+
+  <!DOCTYPE html>
+  <html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <title>确认挪车</title>
+    <style>
+      :root {
+        --sat: env(safe-area-inset-top, 0px);
+        --sar: env(safe-area-inset-right, 0px);
+        --sab: env(safe-area-inset-bottom, 0px);
+        --sal: env(safe-area-inset-left, 0px);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+      html {
+        font-size: 16px;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(160deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+        padding: clamp(16px, 4vw, 24px);
+        padding-top: calc(clamp(16px, 4vw, 24px) + var(--sat));
+        padding-bottom: calc(clamp(16px, 4vw, 24px) + var(--sab));
+        padding-left: calc(clamp(16px, 4vw, 24px) + var(--sal));
+        padding-right: calc(clamp(16px, 4vw, 24px) + var(--sar));
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .card {
+        background: rgba(255,255,255,0.95);
+        padding: clamp(24px, 6vw, 36px);
+        border-radius: clamp(24px, 6vw, 32px);
+        text-align: center;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+      }
+      .emoji {
+        font-size: clamp(52px, 13vw, 72px);
+        margin-bottom: clamp(16px, 4vw, 24px);
+        display: block;
+      }
+      h1 {
+        font-size: clamp(22px, 5.5vw, 28px);
+        color: #2d3748;
+        margin-bottom: 8px;
+      }
+      .subtitle {
+        color: #718096;
+        font-size: clamp(14px, 3.5vw, 16px);
+        margin-bottom: clamp(20px, 5vw, 28px);
+      }
+
+      .map-section {
+        background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+        border-radius: clamp(14px, 3.5vw, 18px);
+        padding: clamp(14px, 3.5vw, 20px);
+        margin-bottom: clamp(16px, 4vw, 24px);
+        display: none;
+      }
+      .map-section.show { display: block; }
+      .map-section p {
+        font-size: clamp(12px, 3.2vw, 14px);
+        color: #6366f1;
+        margin-bottom: 12px;
+        font-weight: 600;
+      }
+      .map-links {
+        display: flex;
+        gap: clamp(8px, 2vw, 12px);
+        flex-wrap: wrap;
+      }
+      .map-btn {
+        flex: 1;
+        min-width: 110px;
+        padding: clamp(12px, 3vw, 16px);
+        border-radius: clamp(10px, 2.5vw, 14px);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: clamp(13px, 3.5vw, 15px);
+        text-align: center;
+        transition: transform 0.2s;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .map-btn:active { transform: scale(0.96); }
+      .map-btn.amap { background: #1890ff; color: white; }
+      .map-btn.apple { background: #1d1d1f; color: white; }
+
+      .loc-status {
+        background: #fef3c7;
+        border-radius: clamp(10px, 2.5vw, 14px);
+        padding: clamp(10px, 2.5vw, 14px) clamp(14px, 3.5vw, 18px);
+        margin-bottom: clamp(16px, 4vw, 24px);
+        font-size: clamp(13px, 3.5vw, 15px);
+        color: #92400e;
+        display: none;
+      }
+      .loc-status.show { display: block; }
+      .loc-status.success { background: #d1fae5; color: #065f46; }
+      .loc-status.error { background: #fee2e2; color: #991b1b; }
+
+      .btn {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        width: 100%;
+        padding: clamp(16px, 4vw, 20px);
+        border-radius: clamp(14px, 3.5vw, 18px);
+        font-size: clamp(16px, 4.2vw, 19px);
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition: all 0.2s;
+        min-height: 56px;
+      }
+      .btn:active { transform: scale(0.98); }
+      .btn:disabled {
+        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+
+      .done-msg {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        border-radius: clamp(14px, 3.5vw, 18px);
+        padding: clamp(16px, 4vw, 24px);
+        margin-top: clamp(16px, 4vw, 24px);
+        display: none;
+      }
+      .done-msg.show { display: block; }
+      .done-msg p {
+        color: #065f46;
+        font-weight: 600;
+        font-size: clamp(15px, 4vw, 17px);
+      }
+
+      /* iPad / 平板适配 */
+      @media (min-width: 768px) {
+        .card {
+          max-width: 440px;
+          padding: 40px;
+        }
+      }
+
+      /* 横屏适配 */
+      @media (orientation: landscape) and (max-height: 500px) {
+        body {
+          justify-content: flex-start;
+          padding-top: calc(12px + var(--sat));
+        }
+        .card {
+          padding: 20px 28px;
+        }
+        .emoji {
+          font-size: 44px;
+          margin-bottom: 12px;
+        }
+        .subtitle {
+          margin-bottom: 16px;
+        }
+      }
+
+      /* 小屏手机适配 */
+      @media (max-width: 350px) {
+        .card {
+          padding: 20px;
+          border-radius: 20px;
+        }
+        .map-btn {
+          min-width: 100px;
+          padding: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <span class="emoji">👋</span>
+      <h1>收到挪车请求</h1>
+      <p class="subtitle">对方正在等待，请尽快确认</p>
+
+      <div id="mapArea" class="map-section">
+        <p>📍 对方位置</p>
+        <div class="map-links">
+          <a id="amapLink" href="#" class="map-btn amap">🗺️ 高德地图</a>
+          <a id="appleLink" href="#" class="map-btn apple">🍎 Apple地图</a>
+        </div>
+      </div>
+
+      <button id="confirmBtn" class="btn" onclick="confirmMove()">
+        <span>🚀</span>
+        <span>我已知晓，正在前往</span>
+      </button>
+
+      <div id="doneMsg" class="done-msg">
+        <p>✅ 已通知对方您正在赶来！</p>
       </div>
     </div>
 
-    <button class="btn">
-      <span>🚀</span>
-      <span>我已知晓，正在前往</span>
-    </button>
-  </div>
-</body>
-</html>
+    <script>
+      let ownerLocation = null;
+
+      window.onload = async () => {
+        try {
+          const res = await fetch('/api/get-location');
+          if(res.ok) {
+            const data = await res.json();
+            if(data.amapUrl) {
+              document.getElementById('mapArea').classList.add('show');
+              document.getElementById('amapLink').href = data.amapUrl;
+              document.getElementById('appleLink').href = data.appleUrl;
+            }
+          }
+        } catch(e) {}
+      }
+
+      // 点击确认按钮时，触发浏览器授权
+      async function confirmMove() {
+        const btn = document.getElementById('confirmBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span>📍</span><span>获取位置中...</span>';
+
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              // 允许 → 发送确认 + 位置
+              ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+              await doConfirm();
+            },
+            async (err) => {
+              // 拒绝或失败 → 直接发送确认，不带位置
+              ownerLocation = null;
+              await doConfirm();
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        } else {
+          // 浏览器不支持定位 → 直接发送确认
+          ownerLocation = null;
+          await doConfirm();
+        }
+      }
+
+      // 发送确认
+      async function doConfirm() {
+        const btn = document.getElementById('confirmBtn');
+        btn.innerHTML = '<span>⏳</span><span>确认中...</span>';
+
+        try {
+          await fetch('/api/owner-confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location: ownerLocation })
+          });
+
+          btn.innerHTML = '<span>✅</span><span>已确认</span>';
+          btn.style.background = 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)';
+          document.getElementById('doneMsg').classList.add('show');
+        } catch(e) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>🚀</span><span>我已知晓，正在前往</span>';
+        }
+      }
+    </script>
+  </body>
+  </html>
+  
