@@ -9,6 +9,7 @@
  * MOVE_CAR_STATUS: 必需。用于存储挪车状态和位置信息。
  */
 
+
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request))
 })
@@ -135,11 +136,9 @@ async function handleNotify(request, url) {
     let notifyBody = `🚗 挪车请求: ${license}`;
     if (message) notifyBody += `\n💬 留言: ${message}`;
 
-    // 存储 Requester 位置信息
     if (location && location.lat && location.lng) {
       const urls = generateMapUrls(location.lat, location.lng);
       notifyBody += '\n📍 已附带位置信息，点击查看';
-
       await MOVE_CAR_STATUS.put(`req_loc:${license}`, JSON.stringify({
         lat: location.lat,
         lng: location.lng,
@@ -149,7 +148,9 @@ async function handleNotify(request, url) {
       notifyBody += '\n⚠️ 未提供位置信息';
     }
 
+    // 初始化状态，清除之前的拨号许可状态
     await MOVE_CAR_STATUS.put(`status:${license}`, 'waiting', { expirationTtl: 600 });
+    await MOVE_CAR_STATUS.delete(`allow_call:${license}`);
 
     if (delayed) {
       await new Promise(resolve => setTimeout(resolve, 30000));
@@ -157,9 +158,7 @@ async function handleNotify(request, url) {
 
     let barkBase = config.barkUrl;
     if (barkBase.endsWith('/')) barkBase = barkBase.slice(0, -1);
-    
     const barkApiUrl = `${barkBase}/挪车请求/${encodeURIComponent(notifyBody)}?group=MoveCar&level=critical&call=1&sound=minuet&icon=https://cdn-icons-png.flaticon.com/512/741/741407.png&url=${confirmUrl}`;
-
     const barkResponse = await fetch(barkApiUrl);
     if (!barkResponse.ok) throw new Error('Bark API 请求失败');
 
@@ -188,10 +187,12 @@ async function handleCheckStatus(url) {
 
   const status = await MOVE_CAR_STATUS.get(`status:${license}`);
   const ownerLocation = await MOVE_CAR_STATUS.get(`owner_loc:${license}`);
+  const allowCall = await MOVE_CAR_STATUS.get(`allow_call:${license}`);
   
   return new Response(JSON.stringify({
     status: status || 'waiting',
-    ownerLocation: ownerLocation ? JSON.parse(ownerLocation) : null
+    ownerLocation: ownerLocation ? JSON.parse(ownerLocation) : null,
+    allowCall: allowCall === 'true' // 返回布尔值给前端
   }), {
     headers: { 'Content-Type': 'application/json' }
   });
@@ -202,6 +203,7 @@ async function handleOwnerConfirmAction(request) {
     const body = await request.json();
     const license = body.license;
     const ownerLocation = body.location || null;
+    const allowCall = body.allowCall || false;
 
     if (!license) throw new Error('Missing license');
 
@@ -215,7 +217,10 @@ async function handleOwnerConfirmAction(request) {
       }), { expirationTtl: CONFIG.KV_TTL });
     }
 
+    // 存储拨号许可状态
+    await MOVE_CAR_STATUS.put(`allow_call:${license}`, allowCall.toString(), { expirationTtl: 600 });
     await MOVE_CAR_STATUS.put(`status:${license}`, 'confirmed', { expirationTtl: 600 });
+    
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
     });
@@ -380,7 +385,10 @@ function renderNotifyPage(origin, license) {
       .map-links a { display: block; padding: 10px; text-align: center; background: #eee; margin-top: 5px; border-radius: 8px; text-decoration: none; color: #333; }
       .btn-retry, .btn-phone { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; color: white; margin-top: 10px; cursor: pointer; display: flex; justify-content: center; text-decoration: none; box-sizing: border-box; }
       .btn-retry { background: orange; }
-      .btn-phone { background: #ef4444; }
+      .btn-retry:disabled { background: #fbd38d; cursor: not-allowed; }      
+      /* 电话按钮默认灰色不可用 */      
+      .btn-phone { background: #ccc; cursor: not-allowed; pointer-events: none; }
+      .btn-phone.active { background: #33CCFF; cursor: pointer; pointer-events: auto; }
       .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 999; }
       .modal-overlay.show { display: flex; }
       .modal-box { background: white; padding: 20px; border-radius: 15px; width: 80%; text-align: center; }
@@ -404,7 +412,6 @@ function renderNotifyPage(origin, license) {
         <h1>通知车主-${license}</h1>
         <div style="font-size: 60px; margin-bottom: 5px;">🚗</div>
       </div>
-
       <div class="card input-card">
         <textarea id="msgInput" placeholder="输入留言给车主...（可选）"></textarea>
         <div class="tags">
@@ -414,7 +421,6 @@ function renderNotifyPage(origin, license) {
           <div class="tag" onclick="addTag('麻烦请尽快')">🙏加急</div>
         </div>
       </div>
-
       <div class="card loc-card" onclick="requestLocation()">
         <div id="locIcon" class="loc-icon">📍</div>
         <div>
@@ -422,7 +428,6 @@ function renderNotifyPage(origin, license) {
           <div id="locStatus" style="font-size:12px; color:#666">点击获取位置</div>
         </div>
       </div>
-
       <button id="notifyBtn" class="btn-main" onclick="sendNotify()">
         <span>🔔</span><span>通知车主</span>
       </button>
@@ -434,7 +439,6 @@ function renderNotifyPage(origin, license) {
         <h2>通知已发送</h2>
         <p id="waitingText">等待车主回应...</p>
       </div>
-
       <div id="ownerFeedback" class="card hidden" style="text-align:center; border:2px solid #80D0C7">
         <h3>车主已收到通知</h3>
         <p>正在赶来，点击查看车主位置</p>
@@ -443,11 +447,10 @@ function renderNotifyPage(origin, license) {
           <a id="ownerAppleLink" href="#" target="_blank">🍎 Apple地图</a>
         </div>
       </div>
-
       <div class="card">
         <p style="text-align:center; color:#666; margin-bottom:10px">车主没反应？</p>
         <button id="retryBtn" class="btn-retry" onclick="retryNotify()">🔔 再次通知</button>
-        ${phone ? `<a href="tel:${phone}" class="btn-phone">📞 直接打电话</a>` : ''}
+        ${phone ? `<a href="tel:${phone}" id="phoneBtn" class="btn-phone">📞 直接打电话</a>` : ''}
       </div>
     </div>
 
@@ -455,6 +458,8 @@ function renderNotifyPage(origin, license) {
       const LICENSE = "${license}";
       let userLocation = null;
       let checkTimer = null;
+      let countdownTimer = null;
+      let countdownFinished = false;
 
       window.onload = () => document.getElementById('locationTipModal').classList.add('show');
       function hideModalAndReq() {
@@ -488,13 +493,19 @@ function renderNotifyPage(origin, license) {
         setTimeout(() => t.classList.remove('show'), 3000); 
       }
 
-      async function sendNotify() {
+      async function sendNotify(isRetry = false) {
         const btn = document.getElementById('notifyBtn');
+        const retryBtn = document.getElementById('retryBtn');
         const msg = document.getElementById('msgInput').value;
         const delayed = !userLocation;
         
-        btn.disabled = true;
-        btn.innerText = '发送中...';
+        if (!isRetry) {
+          btn.disabled = true;
+          btn.innerText = '发送中...';
+        } else {
+          retryBtn.disabled = true;
+          startCountdown(30);
+        }
 
         try {
           const res = await fetch('/api/notify', {
@@ -506,13 +517,38 @@ function renderNotifyPage(origin, license) {
             document.getElementById('mainView').style.display = 'none';
             document.getElementById('successView').style.display = 'flex';
             if(delayed) showToast('未获取位置，通知将延迟30秒');
-            startPolling();
+            if(!checkTimer) startPolling();
           } else { throw new Error('Failed'); }
         } catch(e) {
           showToast('发送失败');
-          btn.disabled = false;
-          btn.innerHTML = '<span>🔔</span><span>通知车主</span>';
+          if(!isRetry) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>🔔</span><span>通知车主</span>';
+          }
         }
+      }
+
+      function startCountdown(seconds) {
+        const retryBtn = document.getElementById('retryBtn');
+        const phoneBtn = document.getElementById('phoneBtn');
+        let timeLeft = seconds;
+        countdownFinished = false;
+        
+        clearInterval(countdownTimer);
+        countdownTimer = setInterval(() => {
+          retryBtn.innerText = '🔔 再次通知 (' + timeLeft + 's)';
+          if (timeLeft <= 0) {
+            clearInterval(countdownTimer);
+            retryBtn.innerText = '🔔 再次通知';
+            retryBtn.disabled = false;
+            countdownFinished = true;
+            // 倒计时结束且无车主确认消息，则激活电话
+            if (phoneBtn && !document.getElementById('ownerFeedback').classList.contains('active-by-owner')) {
+               phoneBtn.classList.add('active');
+            }
+          }
+          timeLeft--;
+        }, 1000);
       }
 
       function startPolling() {
@@ -523,6 +559,15 @@ function renderNotifyPage(origin, license) {
           try {
             const res = await fetch('/api/check-status?plate=' + encodeURIComponent(LICENSE));
             const data = await res.json();
+            
+            const phoneBtn = document.getElementById('phoneBtn');
+            
+            // 如果车主明确允许或拒绝
+            if (phoneBtn && data.allowCall) {
+              phoneBtn.classList.add('active');
+              document.getElementById('ownerFeedback').classList.add('active-by-owner');
+            }
+
             if (data.status === 'confirmed') {
               document.getElementById('ownerFeedback').classList.remove('hidden');
               if (data.ownerLocation) {
@@ -538,7 +583,7 @@ function renderNotifyPage(origin, license) {
       }
 
       async function retryNotify() {
-        sendNotify();
+        sendNotify(true);
       }
     </script>
   </body>
@@ -547,7 +592,6 @@ function renderNotifyPage(origin, license) {
   return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
 
-// 3. 车主页面
 function renderOwnerPage(license) {
   const html = `
   <!DOCTYPE html>
@@ -565,6 +609,8 @@ function renderOwnerPage(license) {
       .map-box.show { display: block; }
       .map-links { display: flex; gap: 10px; margin-top: 10px; }
       .map-link { flex: 1; padding: 10px; background: white; border-radius: 5px; text-decoration: none; font-size: 14px; border: 1px solid #ddd; }
+      .option-row { margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; color: #555; }
+      input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
     </style>
   </head>
   <body>
@@ -577,6 +623,11 @@ function renderOwnerPage(license) {
           <a id="amap" href="#" class="map-link">高德地图</a>
           <a id="apple" href="#" class="map-link">Apple地图</a>
         </div>
+      </div>
+
+      <div class="option-row">
+        <input type="checkbox" id="allowCall" unchecked>
+        <label for="allowCall">允许对方拨打电话</label>
       </div>
 
       <button id="confirmBtn" class="btn" onclick="confirmMove()">🚀 我已知晓，正在前往</button>
@@ -622,12 +673,13 @@ function renderOwnerPage(license) {
 
       async function doConfirm() {
         const btn = document.getElementById('confirmBtn');
+        const allowCall = document.getElementById('allowCall').checked;
         btn.innerText = '确认中...';
         try {
           await fetch('/api/owner-confirm', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ license: LICENSE, location: ownerLocation })
+            body: JSON.stringify({ license: LICENSE, location: ownerLocation, allowCall: allowCall })
           });
           btn.style.display = 'none';
           document.getElementById('doneMsg').style.display = 'block';
