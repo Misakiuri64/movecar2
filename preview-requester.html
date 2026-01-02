@@ -1,191 +1,74 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
-  <title>请求者页面预览 - MoveCar</title>
-  <style>
-    :root {
-      --sat: env(safe-area-inset-top, 0px);
-      --sar: env(safe-area-inset-right, 0px);
-      --sab: env(safe-area-inset-bottom, 0px);
-      --sal: env(safe-area-inset-left, 0px);
-    }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
-    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
-    html, body { height: 100%; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-      background: linear-gradient(160deg, #0093E9 0%, #80D0C7 100%);
-      min-height: 100vh;
-      padding: clamp(16px, 4vw, 24px);
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-    }
-    body::before {
-      content: ''; position: fixed; inset: 0;
-      background: url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-      z-index: -1;
-    }
-    .container {
-      width: 100%;
-      max-width: 500px;
-      display: flex;
-      flex-direction: column;
-      gap: clamp(12px, 3vw, 20px);
-    }
-    .card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: clamp(20px, 5vw, 28px);
-      padding: clamp(18px, 4vw, 28px);
-      box-shadow: 0 10px 40px rgba(0, 147, 233, 0.2);
-    }
-    .header {
-      text-align: center;
-      padding: clamp(20px, 5vw, 32px) clamp(16px, 4vw, 28px);
-      background: white;
-    }
-    .icon-wrap {
-      width: clamp(72px, 18vw, 100px);
-      height: clamp(72px, 18vw, 100px);
-      background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
-      border-radius: clamp(22px, 5vw, 32px);
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 auto clamp(14px, 3vw, 24px);
-      box-shadow: 0 12px 32px rgba(0, 147, 233, 0.35);
-    }
-    .icon-wrap span { font-size: clamp(36px, 9vw, 52px); }
-    .header h1 {
-      font-size: clamp(22px, 5.5vw, 30px);
-      font-weight: 700;
-      color: #1a202c;
-      margin-bottom: 6px;
-    }
-    .header p {
-      font-size: clamp(13px, 3.5vw, 16px);
-      color: #718096;
-      font-weight: 500;
-    }
-    .input-card { padding: 0; overflow: hidden; }
-    .input-card textarea {
-      width: 100%;
-      min-height: clamp(90px, 20vw, 120px);
-      border: none;
-      padding: clamp(16px, 4vw, 24px);
-      font-size: clamp(15px, 4vw, 18px);
-      font-family: inherit;
-      resize: none;
-      outline: none;
-      color: #2d3748;
-      background: transparent;
-      line-height: 1.5;
-    }
-    .input-card textarea::placeholder { color: #a0aec0; }
-    .tags {
-      display: flex;
-      gap: clamp(6px, 2vw, 10px);
-      padding: 0 clamp(12px, 3vw, 20px) clamp(14px, 3vw, 20px);
-      overflow-x: auto;
-    }
-    .tag {
-      background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
-      color: #00796b;
-      padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 18px);
-      border-radius: 20px;
-      font-size: clamp(13px, 3.5vw, 15px);
-      font-weight: 600;
-      white-space: nowrap;
-      cursor: pointer;
-      border: 1px solid #80cbc4;
-      min-height: 44px;
-      display: flex;
-      align-items: center;
-    }
-    .loc-card {
-      display: flex;
-      align-items: center;
-      gap: clamp(10px, 3vw, 16px);
-      padding: clamp(14px, 3.5vw, 22px) clamp(16px, 4vw, 24px);
-      min-height: 64px;
-    }
-    .loc-icon {
-      width: clamp(44px, 11vw, 56px);
-      height: clamp(44px, 11vw, 56px);
-      border-radius: clamp(14px, 3.5vw, 18px);
-      display: flex; align-items: center; justify-content: center;
-      font-size: clamp(22px, 5.5vw, 28px);
-      background: #d4edda;
-      flex-shrink: 0;
-    }
-    .loc-content { flex: 1; min-width: 0; }
-    .loc-title {
-      font-size: clamp(15px, 4vw, 18px);
-      font-weight: 600;
-      color: #2d3748;
-    }
-    .loc-status {
-      font-size: clamp(12px, 3.2vw, 14px);
-      color: #28a745;
-      margin-top: 3px;
-    }
-    .btn-main {
-      background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
-      color: white;
-      border: none;
-      padding: clamp(16px, 4vw, 22px);
-      border-radius: clamp(16px, 4vw, 22px);
-      font-size: clamp(16px, 4.2vw, 20px);
-      font-weight: 700;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      box-shadow: 0 10px 30px rgba(0, 147, 233, 0.35);
-      min-height: 56px;
-    }
-    .preview-badge {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 12px;
-      z-index: 1000;
-    }
-  </style>
-</head>
-<body>
-  <div class="preview-badge">请求者页面预览</div>
-  <div class="container">
-    <div class="card header">
-      <div class="icon-wrap"><span>🚗</span></div>
-      <h1>呼叫车主挪车</h1>
-      <p>Notify Car Owner</p>
-    </div>
 
-    <div class="card input-card">
-      <textarea placeholder="输入留言给车主...（可选）"></textarea>
-      <div class="tags">
-        <div class="tag">🚧 挡路</div>
-        <div class="tag">⏱️ 临停</div>
-        <div class="tag">📞 没接</div>
-        <div class="tag">🙏 加急</div>
-      </div>
-    </div>
 
-    <div class="card loc-card">
-      <div class="loc-icon">📍</div>
-      <div class="loc-content">
-        <div class="loc-title">我的位置</div>
-        <div class="loc-status">已获取位置 ✓</div>
-      </div>
+  <!DOCTYPE html>
+  <html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>自助挪车服务</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+      .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+      h1 { color: #333; margin-bottom: 20px; font-size: 24px; }
+      /* 输入框样式优化 */
+      input { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 12px; font-size: 18px; margin-bottom: 20px; box-sizing: border-box; text-align: center; text-transform: uppercase; transition: border-color 0.3s; }
+      input:focus { border-color: #0093E9; outline: none; }
+      input::placeholder { color: #aaa; opacity: 1; }
+      button { width: 100%; padding: 15px; background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+      button:active { transform: scale(0.98); }
+      .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+      .toast.show { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>验证车牌</h1>
+      <div style="font-size: 60px; margin-bottom: 10px;">🚗</div>
+      <p style="color: #666; margin-bottom: 25px;">请输入车牌联系车主</p>
+      <input type="text" id="licenseInput" placeholder="例如:沪A888666" autocomplete="on">
+      <button onclick="verifyLicense()" id="btn">下一步</button>
     </div>
-
-    <button class="card btn-main">
-      <span>🔔</span>
-      <span>一键通知车主</span>
-    </button>
-  </div>
-</body>
-</html>
+    <div id="toast" class="toast"></div>
+    <script>
+      async function verifyLicense() {
+        const input = document.getElementById('licenseInput');
+        const btn = document.getElementById('btn');
+        const plate = input.value.trim().toUpperCase();
+        
+        if (!plate) return showToast('请输入车牌');
+        
+        btn.disabled = true;
+        btn.innerText = '查询中...';
+        
+        try {
+          const res = await fetch('/api/verify-license', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ license: plate })
+          });
+          const data = await res.json();
+          
+          if (data.success) {
+            window.location.href = '/notify?plate=' + encodeURIComponent(data.license);
+          } else {
+            showToast(data.message);
+            btn.disabled = false;
+            btn.innerText = '下一步';
+          }
+        } catch (e) {
+          showToast('网络错误，请重试');
+          btn.disabled = false;
+          btn.innerText = '下一步';
+        }
+      }
+      
+      function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+      }
+    </script>
+  </body>
+  </html>
+  
