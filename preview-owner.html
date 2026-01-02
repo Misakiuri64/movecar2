@@ -5,7 +5,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>确认挪车</title>
+    <title>确认挪车 - 沪A888666</title>
     <style>
       body { font-family: sans-serif; background: #667eea; color: #333; padding: 20px; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; }
       .card { background: white; padding: 30px; border-radius: 20px; text-align: center; width:100%; max-width:400px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
@@ -15,6 +15,8 @@
       .map-box.show { display: block; }
       .map-links { display: flex; gap: 10px; margin-top: 10px; }
       .map-link { flex: 1; padding: 10px; background: white; border-radius: 5px; text-decoration: none; font-size: 14px; border: 1px solid #ddd; }
+      .option-row { margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; color: #555; }
+      input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
     </style>
   </head>
   <body>
@@ -27,6 +29,11 @@
           <a id="amap" href="#" class="map-link">高德地图</a>
           <a id="apple" href="#" class="map-link">Apple地图</a>
         </div>
+      </div>
+
+      <div class="option-row">
+        <input type="checkbox" id="allowCall" unchecked>
+        <label for="allowCall">允许对方拨打电话</label>
       </div>
 
       <button id="confirmBtn" class="btn" onclick="confirmMove()">🚀 我已知晓，正在前往</button>
@@ -72,12 +79,13 @@
 
       async function doConfirm() {
         const btn = document.getElementById('confirmBtn');
+        const allowCall = document.getElementById('allowCall').checked;
         btn.innerText = '确认中...';
         try {
           await fetch('/api/owner-confirm', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ license: LICENSE, location: ownerLocation })
+            body: JSON.stringify({ license: LICENSE, location: ownerLocation, allowCall: allowCall })
           });
           btn.style.display = 'none';
           document.getElementById('doneMsg').style.display = 'block';
