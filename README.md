@@ -1,6 +1,7 @@
-﻿# MoveCar - 挪车通知系统
-
+﻿# MoveCar2 Worker - 多车多用户版 挪车通知系统
+ 
 基于 Cloudflare Workers 的智能挪车通知系统，扫码即可通知车主，保护双方隐私。
+代码基于https://github.com/lesnolie/movecar的版本建立,在此感谢该作者的无私奉献。
 
 ## 界面预览
 
@@ -34,11 +35,14 @@
 
 ### 请求者（需要挪车的人）
 
-1. 扫描车上的二维码，进入通知页面
-2. 填写留言（可选），如「挡住出口了」
-3. 允许获取位置（不允许则延迟 30 秒发送）
-4. 点击「通知车主」
-5. 等待车主确认，可查看车主位置
+1. 扫描车上的二维码(无车牌信息的链接二维码)，进入通知页面4  ()
+2. 扫描车上的二维码(有无车牌信息的链接二维码），进入车牌输入页面3 
+(为何有不带车牌的标准页，因为这样可以批量印刷挪车码，同时二维码不会泄露自己的车牌号)
+3. 车牌输入页面-输入车牌，验证车牌通过进入通知页面4
+4. 通知页面-填写留言（可选），如「挡住出口了」
+5. 允许获取位置（不允许则延迟 30 秒发送）
+6. 点击「通知车主」
+7. 等待车主确认，可查看车主位置
 
 ### 车主
 
@@ -50,15 +54,17 @@
 ### 流程图
 
 ```
-请求者                              车主
-  │                                  │
-  ├─ 扫码进入页面                     │
-  ├─ 填写留言、获取位置                │
-  ├─ 点击发送                         │
-  │   ├─ 有位置 → 立即推送 ──────────→ 收到通知
-  │   └─ 无位置 → 30秒后推送 ────────→ 收到通知
-  │                                  │
-  ├─ 等待中...                        ├─ 查看请求者位置
+请求者                                        车主
+  │                                            │
+  ├─ 扫码进入通知页面4                           │
+  ├─ 扫码进入车牌输入页面3                       │
+  ├─ 车牌输入页面3-验证车牌,进入通知页面4         │
+  ├─ 通知页面4 填写留言、获取位置                 │
+  ├─ 点击发送                                   │
+  │   ├─ 有位置 → 立即推送 ────────────────────────→ 收到通知
+  │   └─ 无位置 → 30秒后推送 ──────────────────────→ 收到通知
+  │                                             │
+  ├─ 等待中...                                  ├─ 查看请求者位置
   │                                  ├─ 点击确认，分享位置
   │                                  │
   ├─ 收到确认，查看车主位置 ←──────────┤
@@ -76,99 +82,47 @@
 ### 第二步：创建 Worker
 
 1. 登录后点击左侧菜单「Workers & Pages」
-2. 点击「Create」→「Create Worker」
-3. 名称填 `movecar`（或你喜欢的名字）
-4. 点击「Deploy」
-5. 点击「Edit code」，删除默认代码
-6. 复制 `movecar.js` 全部内容粘贴进去
-7. 点击右上角「Deploy」保存
+2. 点击「创建应用程序」→「从Hello World!开始」
+3. 名称填 `movecar2`（或你喜欢的名字）
+4. 点击「部署」
+5. 点击「编辑代码」，删除默认代码
+6. 复制 `movecar2.js` 全部内容粘贴进去
+7. 点击右上角「部署」保存
 
 ### 第三步：创建 KV 存储
 
-1. 左侧菜单点击「KV」
-2. 点击「Create a namespace」
-3. 名称填 `MOVE_CAR_STATUS`，点击「Add」
-4. 回到你的 Worker →「Settings」→「Bindings」
-5. 点击「Add」→「KV Namespace」
-6. Variable name 填 `MOVE_CAR_STATUS`
-7. 选择刚创建的 namespace，点击「Deploy」
+1. 左侧菜单点击「Workers KV」
+2. 点击「Create Instance」
+3. 名称填 `Movecar2KV`，点击「创建」
+4. 回到你的 Worker →「查看绑定」→「添加绑定」
+5. 选择「KV 命名空间」→ 点击「添加绑定」
+6. 「变量名称」 填 `MOVE_CAR_STATUS`
+7. 选择刚创建的KV命名空间「Movecar2KV」，点击「部署」
 
 ### 第四步：配置环境变量
 
-1. Worker →「Settings」→「Variables and Secrets」
+1. Worker →「设置」→「变量和机密」
 2. 添加以下变量：
-   - `BARK_URL`：你的 Bark 推送地址（如 `https://api.day.app/xxxxx`）
-   - `PHONE_NUMBER`：备用联系电话（可选）
+  变量名称=CAR_LIST
+ * CAR_LIST: 必需。标准格式为CSV，每行一条: 车牌号,BarkURL,电话号码(可选)
+ * 示例:
+ * 沪A888666,https://api.day.app/yyy/,02166668888
+ * 苏E12345,https://api.day.app/xxx/,13800000000
 
 ### 第五步：绑定域名（可选）
 
-1. Worker →「Settings」→「Domains & Routes」
-2. 点击「Add」→「Custom Domain」
-3. 输入你的域名，按提示完成 DNS 配置
+1. Worker →「设置」→「域和路由」
+2. 点击「添加」→「自定义域」
+3. 输入你的域名如「movecar2.abc.com」，按提示完成 DNS 配置
 
 ## 制作挪车码
 
 ### 生成二维码
 
-1. 复制你的 Worker 地址（如 `https://movecar.你的账号.workers.dev`）
+1. 复制你的 Worker 地址（如 `https://movecar2.abc.com`）
 2. 使用任意二维码生成工具（如 草料二维码、QR Code Generator）
 3. 将链接转换为二维码并下载
-
-### 美化挪车牌
-
-使用 AI 工具生成精美的装饰设计：
-
-- **Nanobanana Pro** - 生成装饰图案和背景
-- **ChatGPT** - 生成创意设计图
-
-制作步骤：
-
-1. 用 AI 工具生成你喜欢的装饰图案
-2. 将二维码与生成的图案组合排版
-3. 添加「扫码通知车主」提示文字
-4. 打印、过塑，贴在车上
-
-> 💡 用 AI 生成独一无二的挪车牌，让你的爱车更有个性！
-
-### 效果展示
-
-![挪车码效果](demo.jpg)
-
-## 安全设置（推荐）
-
-为防止境外恶意攻击，建议只允许中国地区访问：
-
-### 方法一：使用 WAF 规则（推荐）
-
-1. 进入 Cloudflare Dashboard → 你的域名
-2. 左侧菜单点击「Security」→「WAF」
-3. 点击「Create rule」
-4. 规则设置：
-   - Rule name：`Block non-CN traffic`
-   - If incoming requests match：`Country does not equal China`
-   - Then：`Block`
-5. 点击「Deploy」
-
-### 方法二：在 Worker 代码中过滤
-
-在 `movecar.js` 的 `handleRequest` 函数开头添加：
-
-```javascript
-async function handleRequest(request) {
-  const country = request.cf?.country;
-  if (country && country !== 'CN') {
-    return new Response('Access Denied', { status: 403 });
-  }
-
-  // 下面保持原有逻辑
-}
-```
-
-> ⚠️ 曾经被境外流量攻击过，强烈建议开启地区限制！
 
 ## License
 
 MIT
-
-
-
