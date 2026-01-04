@@ -54,22 +54,43 @@
 ### 流程图
 
 ```
-请求者                                         车主
-  │                                             │
-  ├─ 扫码进入通知页面4                            │
-  ├─ 扫码进入车牌输入页面3                         │
-  ├─ 车牌输入页面3-验证车牌,进入通知页面4            │
-  ├─ 通知页面4 填写留言、获取位置                   │
-  ├─ 点击发送                                    │
-  │   ├─ 有位置 → 立即推送 ──────────────────────→ 收到通知
-  │   └─ 无位置 → 30秒后推送 ────────────────────→ 收到通知
-  │                                              │
-  ├─ 等待中...                                    ├─ 查看请求者位置
-  │                                              ├─ 点击确认，分享位置
-  │                                              │
-  ├─ 收到确认，查看车主位置 ←──────────────────────┤
-  │                                              │
-  ▼                                              ▼
+graph TD
+    Start([用户扫码访问]) --> IP_Check{是否为中国大陆IP?}
+    IP_Check -- 否 --> Deny[拒绝访问 403]
+    IP_Check -- 是-->[无车牌]-Index[显示首页: 输入车牌]
+    IP_Check -- 是-->[有车牌]-NotifyPage[进入挪车操作页]
+
+    Index --> Verify{API 验证车牌}
+    Verify -- 不存在 --> Index[提示不存在，重新输入车牌]
+    Verify -- 匹配成功 --> NotifyPage[进入挪车操作页]
+
+    subgraph 挪车人操作
+    NotifyPage --> GetLoc[获取挪车人位置信息]
+    GetLoc --> SendAPI[调用 api/notify]
+    SendAPI --> Bark[发送 Bark 强提醒推送至车主]
+    SendAPI --> Polling[开启轮询: 检查车主状态]
+    end
+
+    Bark --> OwnerPage[车主打开确认页]
+
+    subgraph 车主反馈
+    OwnerPage --> ShowUserLoc[查看挪车人地图位置]
+    OwnerPage --> SelectOption[选择是否允许通话]
+    SelectOption --> Confirm[点击: 我已知晓, 正在前往]
+    Confirm --> UpdateKV[更新 KV 状态: confirmed]
+    end
+
+    UpdateKV -.-> Polling
+    
+    Polling --> StateCheck{车主是否确认?}
+    StateCheck -- 是 --> ShowFeedback[前端显示: 车主位置 + 电话按钮激活]
+    StateCheck -- 否 --> Polling
+
+    resend 再次发送信息，并倒计时30s----> StateCheck{车主是否确认?}
+    StateCheck{车主是否确认?}
+    StateCheck -- 是 --> ShowFeedback[前端显示: 车主位置 + 电话按钮激活]
+    StateCheck -- 否 --> 电话按钮自主激活
+    ShowFeedback --> End([完成挪车对接])
 ```
 
 ## 部署教程
