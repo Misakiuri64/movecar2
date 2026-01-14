@@ -122,51 +122,54 @@ async function handleVerifyLicense(request) {
 async function handleNotify(request, url) {
   try {
     const body = await request.json();
-    const license = body.license;
-    const message = body.message || '车旁有人等待';
-    const location = body.location || null;
-    const delayed = body.delayed || false;
+    const { license, message, location, delayed } = body;
 
     const config = getCarConfig(license);
-    if (!config) throw new Error('车辆配置不存在');
+    if (!config) throw new Error('车牌未登记或车牌输入错误');
 
-    // 构造车主确认链接
-    const confirmUrl = encodeURIComponent(`${url.origin}/owner-confirm?plate=${encodeURIComponent(license)}`);
+    // 构造确认链接
+    const confirmUrl = `${url.origin}/owner-confirm?plate=${encodeURIComponent(license)}`;
+    
+    // 统一标题与描述结构
+    const notifyTitle = `🚗 挪车请求: ${license}`;
+    let notifyBody = message ? `💬 留言: ${message}` : '车旁有人等待';
 
-    let notifyBody = `🚗 挪车请求: ${license}`;
-    if (message) notifyBody += `\n💬 留言: ${message}`;
-
-    if (location && location.lat && location.lng) {
+    // 1. 处理位置与 KV 状态初始化
+    if (location?.lat && location?.lng) {
       const urls = generateMapUrls(location.lat, location.lng);
-      notifyBody += '\n📍 已附带位置信息，点击查看';
+      notifyBody += '\n📍 已附带位置信息';
       await MOVE_CAR_STATUS.put(`req_loc:${license}`, JSON.stringify({
-        lat: location.lat,
-        lng: location.lng,
-        ...urls
-      }), { expirationTtl: CONFIG.KV_TTL });
-    } else {
-      notifyBody += '\n⚠️ 未提供位置信息';
+        lat: location.lat, lng: location.lng, ...urls
+      }), { expirationTtl: 600 });
     }
-
-    // 初始化状态，清除之前的拨号许可状态
+    
     await MOVE_CAR_STATUS.put(`status:${license}`, 'waiting', { expirationTtl: 600 });
     await MOVE_CAR_STATUS.delete(`allow_call:${license}`);
 
-    if (delayed) {
-      await new Promise(resolve => setTimeout(resolve, 30000));
+    if (delayed) await new Promise(r => setTimeout(r, 30000));
+
+    // 2. 协议识别与发送
+    const rawConfig = config.barkUrl; 
+    const cleanKey = rawConfig.replace(/<(BARK|SCTAPI)>/, '').replace(/^\/+|\/+$/g, '');
+
+    if (rawConfig.startsWith('<BARK>')) {
+      const barkUrl = `https://api.day.app/${cleanKey}/${encodeURIComponent(notifyTitle)}/${encodeURIComponent(notifyBody)}?group=MoveCar&level=critical&url=${encodeURIComponent(confirmUrl)}`;
+      await fetch(barkUrl);
+    } 
+    else if (rawConfig.startsWith('<SCTAPI>')) {
+      await fetch(`https://sctapi.ftqq.com/${cleanKey}.send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          title: notifyTitle,
+          desp: `${notifyBody}\n\n[点击处理挪车请求](${confirmUrl})`
+        })
+      });
     }
 
-    let barkBase = config.barkUrl;
-    if (barkBase.endsWith('/')) barkBase = barkBase.slice(0, -1);
-    const barkApiUrl = `${barkBase}/挪车请求/${encodeURIComponent(notifyBody)}?group=MoveCar&level=critical&call=1&sound=minuet&icon=https://cdn-icons-png.flaticon.com/512/741/741407.png&url=${confirmUrl}`;
-    const barkResponse = await fetch(barkApiUrl);
-    if (!barkResponse.ok) throw new Error('Bark API 请求失败');
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ success: false, error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
+  } catch (e) {
+    return new Response(JSON.stringify({ success: false, error: e.message }), { status: 500 });
   }
 }
 
@@ -621,7 +624,6 @@ function renderNotifyPage(origin, license) {
   `;
   return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
-
 function renderOwnerPage(license) {
   const html = `
   <!DOCTYPE html>
