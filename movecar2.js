@@ -1,10 +1,10 @@
 /**
  * MoveCar Worker - 单码多车版
  * * 环境变量 (Environment Variables):
- * CAR_LIST: 必需。格式为CSV，每行一条: 车牌号,BarkURL,电话号码(可选)
+ * CAR_LIST: 必需。格式为CSV，每行一条: 车牌号,<BARK/SCTAPI>/YourKey/,电话号码(可选)
  * 示例:
- * 沪A888666,https://api.day.app/yyy/,02166668888
- * 苏E12345,https://api.day.app/xxx/,13800000000
+ * 沪A888666,<SCTAPI>/Yourkey/,02166668888
+ * 苏E12345,<BARK>/YourKey/,13800000000
  * * KV 绑定 (KV Namespace Bindings):
  * MOVE_CAR_STATUS: 必需。用于存储挪车状态和位置信息。
  */
