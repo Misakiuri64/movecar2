@@ -128,8 +128,8 @@ graph TD
   变量名称=CAR_LIST
 * CAR_LIST: 必需。格式为CSV，每行一条: 车牌号,<BARK/SCTAPI>/YourKey/,电话号码(可选)
  * 示例:
- * 沪A888666,<SCTAPI>/Yourkey/,02166668888
- * 苏E12345,<BARK>/YourKey/,13800000000
+ * 沪A888666, &lt;SCTAPI&gt;/Yourkey/,02166668888
+ * 苏E12345, &lt;BARK&gt;/YourKey/,13800000000
  
 ### 第五步：绑定域名（可选）
 
