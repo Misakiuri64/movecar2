@@ -202,11 +202,12 @@ async function handleOwnerConfirmAction(request) {
   try {
     const body = await request.json();
     const license = body.license;
-    const ownerLocation = body.location || null;
+    const ownerLocation = body.location || null; // 此时 body.location 应该仅在车主勾选时才会有值
     const allowCall = body.allowCall || false;
 
     if (!license) throw new Error('Missing license');
 
+    // 严谨逻辑：如果车主本次未传位置（未勾选），则必须删除 KV 中旧的位置记录
     if (ownerLocation) {
       const urls = generateMapUrls(ownerLocation.lat, ownerLocation.lng);
       await MOVE_CAR_STATUS.put(`owner_loc:${license}`, JSON.stringify({
@@ -215,9 +216,12 @@ async function handleOwnerConfirmAction(request) {
         ...urls,
         timestamp: Date.now()
       }), { expirationTtl: CONFIG.KV_TTL });
+    } else {
+      // 关键改进：如果车主取消勾选，显式删除之前的定位，防止请求者看到旧定位
+      await MOVE_CAR_STATUS.delete(`owner_loc:${license}`);
     }
 
-    // 存储拨号许可状态
+    // 更新拨号许可和确认状态
     await MOVE_CAR_STATUS.put(`allow_call:${license}`, allowCall.toString(), { expirationTtl: 600 });
     await MOVE_CAR_STATUS.put(`status:${license}`, 'confirmed', { expirationTtl: 600 });
     
@@ -386,7 +390,6 @@ function renderNotifyPage(origin, license) {
       .btn-retry, .btn-phone { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; color: white; margin-top: 10px; cursor: pointer; display: flex; justify-content: center; text-decoration: none; box-sizing: border-box; }
       .btn-retry { background: orange; }
       .btn-retry:disabled { background: #fbd38d; cursor: not-allowed; }      
-      /* 电话按钮默认灰色不可用 */      
       .btn-phone { background: #ccc; cursor: not-allowed; pointer-events: none; }
       .btn-phone.active { background: #33CCFF; cursor: pointer; pointer-events: auto; }
       .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 999; }
@@ -440,8 +443,8 @@ function renderNotifyPage(origin, license) {
         <p id="waitingText">等待车主回应...</p>
       </div>
       <div id="ownerFeedback" class="card hidden" style="text-align:center; border:2px solid #80D0C7">
-        <h3>车主已收到通知</h3>
-        <p>正在赶来，点击查看车主位置</p>
+        <h3 id="feedbackTitle">车主已收到通知</h3>
+        <p id="feedbackDesc">正在赶来，请稍候</p>
         <div id="ownerMapLinks" class="map-links" style="display:none">
           <a id="ownerAmapLink" href="#" target="_blank">🗺️ 高德地图</a>
           <a id="ownerAppleLink" href="#" target="_blank">🍎 Apple地图</a>
@@ -459,7 +462,9 @@ function renderNotifyPage(origin, license) {
       let userLocation = null;
       let checkTimer = null;
       let countdownTimer = null;
-      let countdownFinished = false;
+      let hasVibrated = false;
+      let notifyCount = 0; 
+      let isOwnerAuthorized = false; // 车主端是否主动授权
 
       window.onload = () => document.getElementById('locationTipModal').classList.add('show');
       function hideModalAndReq() {
@@ -499,12 +504,16 @@ function renderNotifyPage(origin, license) {
         const msg = document.getElementById('msgInput').value;
         const delayed = !userLocation;
         
+        notifyCount++; 
+
         if (!isRetry) {
           btn.disabled = true;
           btn.innerText = '发送中...';
         } else {
           retryBtn.disabled = true;
-          startCountdown(30);
+          // 第二次点(notifyCount=2)等60s，第三次及以后(notifyCount>=3)等180s
+          const waitTime = notifyCount >= 3 ? 180 : 60;
+          startCountdown(waitTime);
         }
 
         try {
@@ -532,8 +541,10 @@ function renderNotifyPage(origin, license) {
         const retryBtn = document.getElementById('retryBtn');
         const phoneBtn = document.getElementById('phoneBtn');
         let timeLeft = seconds;
-        countdownFinished = false;
         
+        // 倒计时开始时，除非车主已授权，否则确保电话按钮灰色
+        if (phoneBtn && !isOwnerAuthorized) phoneBtn.classList.remove('active');
+
         clearInterval(countdownTimer);
         countdownTimer = setInterval(() => {
           retryBtn.innerText = '🔔 再次通知 (' + timeLeft + 's)';
@@ -541,9 +552,9 @@ function renderNotifyPage(origin, license) {
             clearInterval(countdownTimer);
             retryBtn.innerText = '🔔 再次通知';
             retryBtn.disabled = false;
-            countdownFinished = true;
-            // 倒计时结束且无车主确认消息，则激活电话
-            if (phoneBtn && !document.getElementById('ownerFeedback').classList.contains('active-by-owner')) {
+            
+            // 关键修改：只有在第三次通知(notifyCount >= 3)且倒计时结束时，才保底激活电话
+            if (phoneBtn && notifyCount >= 3) {
                phoneBtn.classList.add('active');
             }
           }
@@ -555,28 +566,47 @@ function renderNotifyPage(origin, license) {
         let count = 0;
         checkTimer = setInterval(async () => {
           count++;
-          if (count > 60) clearInterval(checkTimer); // 3分钟后停止
+          if (count > 100) clearInterval(checkTimer);
           try {
             const res = await fetch('/api/check-status?plate=' + encodeURIComponent(LICENSE));
             const data = await res.json();
             
             const phoneBtn = document.getElementById('phoneBtn');
-            
-            // 如果车主明确允许或拒绝
-            if (phoneBtn && data.allowCall) {
-              phoneBtn.classList.add('active');
-              document.getElementById('ownerFeedback').classList.add('active-by-owner');
+            const feedbackCard = document.getElementById('ownerFeedback');
+
+            if (phoneBtn) {
+              if (data.allowCall) {
+                isOwnerAuthorized = true;
+                phoneBtn.classList.add('active');
+                feedbackCard.classList.add('active-by-owner');
+              } else {
+                isOwnerAuthorized = false;
+                // 如果车主没授权，且还没到第三次通知的保底时间，保持灰色
+                // 只有在 notifyCount >= 3 且对应的倒计时已经结束时，才允许保持 active
+                const is保底激活 = (notifyCount >= 3 && document.getElementById('retryBtn').disabled === false);
+                if (!is保底激活) {
+                  phoneBtn.classList.remove('active');
+                  feedbackCard.classList.remove('active-by-owner');
+                }
+              }
             }
 
             if (data.status === 'confirmed') {
-              document.getElementById('ownerFeedback').classList.remove('hidden');
+              feedbackCard.classList.remove('hidden');
+              if (!hasVibrated) {
+                if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                hasVibrated = true;
+              }
+
               if (data.ownerLocation) {
+                document.getElementById('feedbackDesc').innerText = '车主分享了位置，正在赶来';
                 document.getElementById('ownerMapLinks').style.display = 'block';
                 document.getElementById('ownerAmapLink').href = data.ownerLocation.amapUrl;
                 document.getElementById('ownerAppleLink').href = data.ownerLocation.appleUrl;
+              } else {
+                document.getElementById('feedbackDesc').innerText = '车主已确认，正在赶来途中';
+                document.getElementById('ownerMapLinks').style.display = 'none';
               }
-              clearInterval(checkTimer);
-              if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
             }
           } catch(e){}
         }, 3000);
@@ -626,7 +656,11 @@ function renderOwnerPage(license) {
       </div>
 
       <div class="option-row">
-        <input type="checkbox" id="allowCall" unchecked>
+        <input type="checkbox" id="shareLocation">
+        <label for="shareLocation">允许发送我的位置</label>
+      </div>
+      <div class="option-row">
+        <input type="checkbox" id="allowCall">
         <label for="allowCall">允许对方拨打电话</label>
       </div>
 
@@ -654,19 +688,26 @@ function renderOwnerPage(license) {
 
       async function confirmMove() {
         const btn = document.getElementById('confirmBtn');
+        const shareLocChecked = document.getElementById('shareLocation').checked;
+        
         btn.disabled = true;
-        btn.innerText = '获取位置中...';
+        ownerLocation = null; // 每次点击时重置，确保不携带旧状态
 
-        if ('geolocation' in navigator) {
+        if (shareLocChecked && 'geolocation' in navigator) {
+          btn.innerText = '获取位置中...';
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
               doConfirm();
             },
-            () => { ownerLocation = null; doConfirm(); },
+            () => { 
+              ownerLocation = null; 
+              doConfirm(); 
+            },
             { enableHighAccuracy: true, timeout: 5000 }
           );
         } else {
+          // 如果未勾选位置分享，直接发送确认（后端将负责删除旧位置）
           doConfirm();
         }
       }
@@ -676,13 +717,23 @@ function renderOwnerPage(license) {
         const allowCall = document.getElementById('allowCall').checked;
         btn.innerText = '确认中...';
         try {
-          await fetch('/api/owner-confirm', {
+          const res = await fetch('/api/owner-confirm', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ license: LICENSE, location: ownerLocation, allowCall: allowCall })
+            body: JSON.stringify({ 
+              license: LICENSE, 
+              location: ownerLocation, 
+              allowCall: allowCall 
+            })
           });
-          btn.style.display = 'none';
-          document.getElementById('doneMsg').style.display = 'block';
+          
+          if(res.ok) {
+            btn.style.display = 'none';
+            document.querySelectorAll('.option-row').forEach(el => el.style.display = 'none');
+            document.getElementById('doneMsg').style.display = 'block';
+          } else {
+            throw new Error('Server Error');
+          }
         } catch(e) {
           btn.innerText = '重试';
           btn.disabled = false;
