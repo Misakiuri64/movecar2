@@ -32,7 +32,11 @@
       </div>
 
       <div class="option-row">
-        <input type="checkbox" id="allowCall" unchecked>
+        <input type="checkbox" id="shareLocation">
+        <label for="shareLocation">允许发送我的位置</label>
+      </div>
+      <div class="option-row">
+        <input type="checkbox" id="allowCall">
         <label for="allowCall">允许对方拨打电话</label>
       </div>
 
@@ -60,19 +64,26 @@
 
       async function confirmMove() {
         const btn = document.getElementById('confirmBtn');
+        const shareLocChecked = document.getElementById('shareLocation').checked;
+        
         btn.disabled = true;
-        btn.innerText = '获取位置中...';
+        ownerLocation = null; // 每次点击时重置，确保不携带旧状态
 
-        if ('geolocation' in navigator) {
+        if (shareLocChecked && 'geolocation' in navigator) {
+          btn.innerText = '获取位置中...';
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
               doConfirm();
             },
-            () => { ownerLocation = null; doConfirm(); },
+            () => { 
+              ownerLocation = null; 
+              doConfirm(); 
+            },
             { enableHighAccuracy: true, timeout: 5000 }
           );
         } else {
+          // 如果未勾选位置分享，直接发送确认（后端将负责删除旧位置）
           doConfirm();
         }
       }
@@ -82,13 +93,23 @@
         const allowCall = document.getElementById('allowCall').checked;
         btn.innerText = '确认中...';
         try {
-          await fetch('/api/owner-confirm', {
+          const res = await fetch('/api/owner-confirm', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ license: LICENSE, location: ownerLocation, allowCall: allowCall })
+            body: JSON.stringify({ 
+              license: LICENSE, 
+              location: ownerLocation, 
+              allowCall: allowCall 
+            })
           });
-          btn.style.display = 'none';
-          document.getElementById('doneMsg').style.display = 'block';
+          
+          if(res.ok) {
+            btn.style.display = 'none';
+            document.querySelectorAll('.option-row').forEach(el => el.style.display = 'none');
+            document.getElementById('doneMsg').style.display = 'block';
+          } else {
+            throw new Error('Server Error');
+          }
         } catch(e) {
           btn.innerText = '重试';
           btn.disabled = false;
