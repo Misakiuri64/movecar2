@@ -1,10 +1,10 @@
 /**
  * MoveCar Worker - 单码多车版
  * * 环境变量 (Environment Variables):
- * CAR_LIST: 必需。格式为CSV，每行一条: 车牌号,<BARK/SCTAPI>/YourKey/,电话号码(可选)
+ * CAR_LIST: 必需。格式为CSV，每行一条: 车牌号,BarkURL,电话号码(可选)
  * 示例:
- * 沪A888666,<SCTAPI>/Yourkey/,02166668888
- * 苏E12345,<BARK>/YourKey/,13800000000
+ * 沪A888666,https://api.day.app/yyy/,02166668888
+ * 苏E12345,https://api.day.app/xxx/,13800000000
  * * KV 绑定 (KV Namespace Bindings):
  * MOVE_CAR_STATUS: 必需。用于存储挪车状态和位置信息。
  */
@@ -152,12 +152,18 @@ async function handleNotify(request, url) {
     const rawConfig = config.barkUrl; 
     const cleanKey = rawConfig.replace(/<(BARK|SCTAPI)>/, '').replace(/^\/+|\/+$/g, '');
 
+    // 分支：Bark 协议 (保持原始逻辑)
     if (rawConfig.startsWith('<BARK>')) {
       const barkUrl = `https://api.day.app/${cleanKey}/${encodeURIComponent(notifyTitle)}/${encodeURIComponent(notifyBody)}?group=MoveCar&level=critical&url=${encodeURIComponent(confirmUrl)}`;
       await fetch(barkUrl);
     } 
+    // 分支：Server酱³ (SC3) 协议修正
     else if (rawConfig.startsWith('<SCTAPI>')) {
-      await fetch(`https://sctapi.ftqq.com/${cleanKey}.send`, {
+      // 提取 sendkey 并清理前后斜杠
+      const uidMatch = cleanKey.match(/^sctp(\d+)t/);
+      if (!uidMatch) throw new Error('Server酱³ SendKey 格式不正确，无法提取 UID');
+      const uid = uidMatch[1];
+      await fetch(`https://${uid}.push.ft07.com/send/${cleanKey}.send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
