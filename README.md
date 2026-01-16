@@ -55,12 +55,6 @@
 5. 点击确认，根据需要决定是否显示拨打电话链接。
 
 ### 流程图
-graph TD
-    %% 定义样式
-    classDef start fill:#f9f,stroke:#33,stroke-width:2px;
-    classDef process fill:#fff,stroke:#33,stroke-width:1px;
-    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
-    classDef highlight fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
 
     Start((开始)) --> Input[挪车人输入车牌]
     Input --> Verify{车牌校验}
@@ -91,10 +85,6 @@ graph TD
     Success --> CallCheck{是否激活拨号?}
     CallCheck -- 车主授权或重试3次 --> Call[显示拨打电话按钮]
     CallCheck -- 未满足条件 --> Wait[继续等待]
-
-    class Start start;
-    class Verify,LocCheck,Check,CallCheck decision;
-    class Success,Call highlight;
 
 ## 部署教程
 
