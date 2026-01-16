@@ -56,45 +56,46 @@
 
 ### 流程图
 
-```
 graph TD
-    Start([用户扫码访问]) --> IP_Check{是否为中国大陆IP?}
-    IP_Check -- 否 --> Deny[拒绝访问 403]
-    IP_Check -- 是-->[无车牌]-Index[显示首页: 输入车牌]
-    IP_Check -- 是-->[有车牌]-NotifyPage[进入挪车操作页]
+    %% 定义样式
+    classDef start fill:#f9f,stroke:#33,stroke-width:2px;
+    classDef process fill:#fff,stroke:#33,stroke-width:1px;
+    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+    classDef highlight fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
 
-    Index --> Verify{API 验证车牌}
-    Verify -- 不存在 --> Index[提示不存在，重新输入车牌]
-    Verify -- 匹配成功 --> NotifyPage[进入挪车操作页]
-
-    subgraph 挪车人操作
-    NotifyPage --> GetLoc[获取挪车人位置信息]
-    GetLoc --> SendAPI[调用 api/notify]
-    SendAPI --> BARK/SCTAPI[发送 Bark/Server酱 强提醒推送至车主]
-    SendAPI --> Polling[开启轮询: 检查车主状态]
-    end
-
-    Bark --> OwnerPage[车主打开确认页]
-
-    subgraph 车主反馈
-    OwnerPage --> ShowUserLoc[查看挪车人地图位置]
-    OwnerPage --> SelectOption[选择是否允许通话]
-    SelectOption --> Confirm[点击: 我已知晓, 正在前往]
-    Confirm --> UpdateKV[更新 KV 状态: confirmed]
-    end
-
-    UpdateKV -.-> Polling
+    Start((开始)) --> Input[挪车人输入车牌]
+    Input --> Verify{车牌校验}
     
-    Polling --> StateCheck{车主是否确认?}
-    StateCheck -- 是 --> ShowFeedback[前端显示: 车主位置 + 电话按钮激活]
-    StateCheck -- 否 --> Polling
+    Verify -- 不存在 --> Error[提示车牌未登记]
+    Verify -- 存在 --> LocCheck{是否获取定位?}
 
-    resend 再次发送信息，并倒计时30s----> StateCheck{车主是否确认?}
-    StateCheck{车主是否确认?}
-    StateCheck -- 是 --> ShowFeedback[前端显示: 车主位置 + 电话按钮激活]
-    StateCheck -- 否 --> 电话按钮自主激活
-    ShowFeedback --> End([完成挪车对接])
-```
+    LocCheck -- 允许 --> SendNow[立即发送通知]
+    LocCheck -- 拒绝 --> Delay[延迟30秒发送通知]
+
+    SendNow --> Push[触发 Bark/Server酱 推送]
+    Delay --> Push
+
+    Push --> Polling[挪车人进入倒计时/状态轮询]
+
+    subgraph 车主端处理
+        Push -.-> OwnerPage[车主打开确认页]
+        OwnerPage --> SetAuth[选择: 分享位置 / 允许通话]
+        SetAuth --> Confirm[点击: 我已知晓, 正在前往]
+    end
+
+    Confirm --> KV[更新 KV 状态: confirmed]
+    
+    Polling --> Check{检查 KV 状态}
+    Check -- 等待中 --> Polling
+    Check -- 已确认 --> Success[展示车主位置/震动提醒]
+    
+    Success --> CallCheck{是否激活拨号?}
+    CallCheck -- 车主授权或重试3次 --> Call[显示拨打电话按钮]
+    CallCheck -- 未满足条件 --> Wait[继续等待]
+
+    class Start start;
+    class Verify,LocCheck,Check,CallCheck decision;
+    class Success,Call highlight;
 
 ## 部署教程
 
